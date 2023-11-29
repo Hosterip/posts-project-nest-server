@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaService } from '../database/prisma.service';
+import { PrismaService } from '../../database/prisma.service';
 import { Post, Prisma } from '@prisma/client';
 
 @Injectable()
 export class PostService {
   constructor(private prisma: PrismaService) {}
 
-  async post(
+  async getAPost(
     postWhereUniqueInput: Prisma.PostWhereUniqueInput,
   ): Promise<Post | null> {
     return this.prisma.post.findUnique({
@@ -14,19 +14,21 @@ export class PostService {
     });
   }
 
-  async posts(params: {
+  async getPosts(params: {
     skip?: number;
     take?: number;
-    where?: Prisma.PostWhereUniqueInput;
+    where?: Prisma.PostWhereInput;
     orderBy?: Prisma.PostOrderByWithRelationInput;
-  }): Promise<Post[]> {
+  }): Promise<{ posts: Post[]; totalPages: number }> {
     const { skip, take, where, orderBy } = params;
-    return this.prisma.post.findMany({
+    const totalCount = await this.prisma.post.count({ where });
+    const posts = await this.prisma.post.findMany({
       skip,
       take,
       where,
       orderBy,
     });
+    return { posts, totalPages: Math.ceil(totalCount / take) };
   }
 
   async createPost(data: Prisma.PostCreateInput): Promise<Post> {

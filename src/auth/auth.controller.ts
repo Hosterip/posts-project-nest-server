@@ -1,21 +1,25 @@
 import {
   Body,
   Controller,
+  HttpException,
+  HttpStatus,
   Post,
   Req,
+  Res,
   UseGuards,
   UsePipes,
   ValidationPipe,
 } from '@nestjs/common';
-import { AuthGuard } from '@nestjs/passport';
-import { Request } from 'express';
+import { Request, Response } from 'express';
 import { createUserDto } from '../users/dto/createUserDto';
 import { AuthService } from './services/auth.service';
 import { LocalAuthGuard } from './localAuth.guard';
+import { IsAuthGuard } from './guards/is-auth/is-auth.guard';
 
 @Controller()
 export class AuthController {
   constructor(private authService: AuthService) {}
+
   @Post('login')
   @UseGuards(LocalAuthGuard)
   login(@Req() req: Request) {
@@ -24,8 +28,29 @@ export class AuthController {
 
   @Post('register')
   @UsePipes(new ValidationPipe())
-  register(@Body() body: createUserDto) {
+  async register(
+    @Body() body: createUserDto,
+    @Req() req: Request & { session: { passport?: any } },
+    @Res() res: Response,
+  ) {
     const { username, password } = body;
-    this.authService.signUp(username, password).then(() => AuthGuard('local'));
+    const user = await this.authService.signUp(username, password);
+    if (user) {
+      req.session.passport = { user: user.id };
+      res.redirect('/user');
+    }
+  }
+
+  @Post('logout')
+  @UseGuards(IsAuthGuard)
+  async logout(@Req() req: Request) {
+    req.session.destroy((err) => {
+      if (err)
+        throw new HttpException(
+          'Something went wrong',
+          HttpStatus.INTERNAL_SERVER_ERROR,
+        );
+    });
+    return 'Success';
   }
 }

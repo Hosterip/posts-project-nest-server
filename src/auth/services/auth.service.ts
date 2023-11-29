@@ -1,11 +1,6 @@
-import {
-  BadRequestException,
-  HttpException,
-  HttpStatus,
-  Injectable,
-} from '@nestjs/common';
+import { HttpException, HttpStatus, Injectable } from '@nestjs/common';
 import { UserService } from '../../users/services/user.service';
-import { genHashAndSalt, validPassword } from '../../utils/passwordUtils';
+import { genHashAndSalt, validPassword } from '../utils/passwordUtils';
 
 @Injectable()
 export class AuthService {
@@ -17,8 +12,8 @@ export class AuthService {
     });
     if (!user)
       throw new HttpException('Wrong username', HttpStatus.BAD_REQUEST);
-    const { hash, salt } = genHashAndSalt(password);
-    const hashValid = validPassword(password, salt, hash);
+
+    const hashValid = validPassword(password, user.salt, user.hash);
     if (!hashValid)
       throw new HttpException('Wrong password', HttpStatus.BAD_REQUEST);
 
@@ -27,16 +22,18 @@ export class AuthService {
 
   async signUp(username: string, password: string): Promise<any> {
     const { hash, salt } = genHashAndSalt(password);
-    const user = await this.userService.createUser({
-      username,
-      hash,
-      salt,
-    });
-
-    if (!user) {
-      throw new BadRequestException();
-    }
-
-    return user;
+    return await this.userService
+      .createUser({
+        username,
+        hash,
+        salt,
+      })
+      .catch((e) => {
+        console.error(e);
+        throw new HttpException(
+          'Username must be unique',
+          HttpStatus.BAD_REQUEST,
+        );
+      });
   }
 }
